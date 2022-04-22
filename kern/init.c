@@ -1,11 +1,15 @@
 /* See COPYRIGHT for copyright information. */
 
+#include "inc/types.h"
+#include "inc/x86.h"
 #include <inc/stdio.h>
 #include <inc/string.h>
 #include <inc/assert.h>
 
 #include <kern/monitor.h>
 #include <kern/console.h>
+
+void my_test(uint32_t a, uint32_t b, uint32_t c);
 
 // Test the stack backtrace function (lab 1 only)
 void
@@ -34,6 +38,7 @@ i386_init(void)
 	cons_init();
 
 	cprintf("6828 decimal is %o octal!\n", 6828);
+	my_test(0, 1, 2);
 
 	// Test the stack backtrace function (lab 1 only)
 	test_backtrace(5);
@@ -41,6 +46,11 @@ i386_init(void)
 	// Drop into the kernel monitor.
 	while (1)
 		monitor(NULL);
+}
+
+void
+my_test(uint32_t a, uint32_t b, uint32_t c)
+{
 }
 
 

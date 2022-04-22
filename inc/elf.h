@@ -1,3 +1,4 @@
+#include "types.h"
 #ifndef JOS_INC_ELF_H
 #define JOS_INC_ELF_H
 

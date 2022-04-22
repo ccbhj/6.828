@@ -1,3 +1,4 @@
+#include "inc/stdio.h"
 #include <inc/stab.h>
 #include <inc/string.h>
 #include <inc/memlayout.h>
@@ -179,7 +180,13 @@ debuginfo_eip(uintptr_t addr, struct Eipdebuginfo *info)
 	//	Look at the STABS documentation and <inc/stab.h> to find
 	//	which one.
 	// Your code here.
-
+    for (int i=lline; i <= rline; i++) {
+        if (stabs[i].n_type == N_SLINE)  {
+            info->eip_line = stabs[i].n_desc;
+            break;
+        }
+    }
+	
 
 	// Search backwards from the line number for the relevant filename
 	// stab.
