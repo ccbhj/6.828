@@ -1,5 +1,7 @@
 /* See COPYRIGHT for copyright information. */
 
+#include "inc/types.h"
+#include "inc/x86.h"
 #include <inc/stdio.h>
 #include <inc/string.h>
 #include <inc/assert.h>
@@ -46,6 +48,7 @@ i386_init(void)
 	// We only have one user environment for now, so just run it.
 	env_run(&envs[0]);
 }
+
 
 
 /*

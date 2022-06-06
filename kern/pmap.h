@@ -25,6 +25,8 @@ extern pde_t *kern_pgdir;
  */
 #define PADDR(kva) _paddr(__FILE__, __LINE__, kva)
 
+#define virt2phys(kva) _paddr(__FILE__, __LINE__, kva)
+
 static inline physaddr_t
 _paddr(const char *file, int line, void *kva)
 {
@@ -36,6 +38,8 @@ _paddr(const char *file, int line, void *kva)
 /* This macro takes a physical address and returns the corresponding kernel
  * virtual address.  It panics if you pass an invalid physical address. */
 #define KADDR(pa) _kaddr(__FILE__, __LINE__, pa)
+
+#define phys2virt(pa) _kaddr(__FILE__, __LINE__, pa)
 
 static inline void*
 _kaddr(const char *file, int line, physaddr_t pa)
@@ -76,7 +80,7 @@ static inline struct PageInfo*
 pa2page(physaddr_t pa)
 {
 	if (PGNUM(pa) >= npages)
-		panic("pa2page called with invalid pa");
+		panic("pa2page called with invalid pa 0x%x", pa);
 	return &pages[PGNUM(pa)];
 }
 

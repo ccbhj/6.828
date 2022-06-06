@@ -1,6 +1,7 @@
 // Simple command-line kernel monitor useful for
 // controlling the kernel and exploring the system interactively.
 
+#include "inc/types.h"
 #include <inc/stdio.h>
 #include <inc/string.h>
 #include <inc/memlayout.h>
@@ -55,10 +56,36 @@ mon_kerninfo(int argc, char **argv, struct Trapframe *tf)
 	return 0;
 }
 
-int
+#define NARG 5
+#define MAX_FUNC_NAME 32
+
+extern inline int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 {
 	// Your code here.
+	uint32_t ebp = read_ebp();
+	uint32_t eip = 0;
+	uint32_t args[NARG];
+	uint32_t i = 0;
+	char func_name[MAX_FUNC_NAME];
+	char *np = func_name;
+
+	struct Eipdebuginfo eip_info;
+	do {
+		eip = *((uint32_t*)(uintptr_t)(ebp + sizeof(uint32_t)));
+		for (i = 0; i < NARG; i++) {
+			 args[i] = *((uint32_t*)(uintptr_t)(ebp +  sizeof(uint32_t) * (2 + i)));
+		}
+		debuginfo_eip((uint32_t)eip, &eip_info);
+
+		cprintf(" ebp %x  eip %x args %08x %08x %08x %08x %08x\n", ebp, eip, 
+			args[0], args[1], args[2], args[3], args[4]);
+
+	 	cprintf("   %s:%d: %.*s+%d\n",
+	 		eip_info.eip_file, eip_info.eip_line, eip_info.eip_fn_namelen, eip_info.eip_fn_name, eip - eip_info.eip_fn_addr);
+
+		ebp = *((uint32_t*)(uintptr_t)ebp);
+	} while(ebp > 0x0);
 	return 0;
 }
 

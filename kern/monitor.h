@@ -1,10 +1,14 @@
 #ifndef JOS_KERN_MONITOR_H
 #define JOS_KERN_MONITOR_H
+#include "inc/types.h"
 #ifndef JOS_KERNEL
 # error "This is a JOS kernel header; user programs should not #include it"
 #endif
 
-struct Trapframe;
+struct Trapframe {
+	uint32_t esp;
+	uint32_t ebp;
+};
 
 // Activate the kernel monitor,
 // optionally providing a trap frame indicating the current state

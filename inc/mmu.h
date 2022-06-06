@@ -1,6 +1,8 @@
 #ifndef JOS_INC_MMU_H
 #define JOS_INC_MMU_H
 
+#define VTOPHYS(la) ((char*)((uintptr_t)(la) - (uintptr_t)KERNBASE))
+
 /*
  * This file contains definitions for the x86 memory management unit (MMU),
  * including paging- and segmentation-related data structures and constants,

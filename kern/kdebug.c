@@ -1,3 +1,4 @@
+#include "inc/stdio.h"
 #include <inc/stab.h>
 #include <inc/string.h>
 #include <inc/memlayout.h>
@@ -90,9 +91,11 @@ stab_binsearch(const struct Stab *stabs, int *region_left, int *region_right,
 		}
 	}
 
-	if (!any_matches)
+	if (!any_matches){
+		if (region_right == NULL || region_left == NULL)
+			return;
 		*region_right = *region_left - 1;
-	else {
+	}else {
 		// find rightmost region containing 'addr'
 		for (l = *region_right;
 		     l > *region_left && stabs[l].n_type != type;
@@ -204,8 +207,10 @@ debuginfo_eip(uintptr_t addr, struct Eipdebuginfo *info)
 	//	Look at the STABS documentation and <inc/stab.h> to find
 	//	which one.
 	// Your code here.
-
-
+	stab_binsearch(stabs, &lline, &rline, N_SLINE, addr);
+	if (lline > rline)
+		return -1;
+	info->eip_line = stabs[lline].n_desc;
 	// Search backwards from the line number for the relevant filename
 	// stab.
 	// We can't just use the "lfile" stab because inlined functions
