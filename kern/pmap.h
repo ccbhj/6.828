@@ -92,4 +92,9 @@ page2kva(struct PageInfo *pp)
 
 pte_t *pgdir_walk(pde_t *pgdir, const void *va, int create);
 
+void mappages(pte_t *pgdir, uintptr_t from_va, physaddr_t to_pa, size_t npage, int perm);
+
+void setup_vm(pte_t *pgdir);
+int pages_cpy(pde_t *dst_pgdir, pde_t *src_pgdir, uintptr_t src_va, size_t len, int perm);
+void pages_clear(pde_t *pgdir, uintptr_t src_va, size_t len);
 #endif /* !JOS_KERN_PMAP_H */

@@ -5,10 +5,7 @@
 # error "This is a JOS kernel header; user programs should not #include it"
 #endif
 
-struct Trapframe {
-	uint32_t esp;
-	uint32_t ebp;
-};
+struct Trapframe;
 
 // Activate the kernel monitor,
 // optionally providing a trap frame indicating the current state
