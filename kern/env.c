@@ -191,7 +191,6 @@ env_setup_vm(struct Env *e)
 	
 	// LAB 3: Your code here.
 	e->env_pgdir = page2kva(p);
-	cprintf("e->pgdir=[0x%x, 0x%x]\n", page2kva(p), page2pa(p));
 	p->pp_ref++;
 	
 	setup_vm(e->env_pgdir);
@@ -381,7 +380,6 @@ load_icode(struct Env *e, uint8_t *binary)
 		region_alloc(e, (void*)(uintptr_t)ph->p_va, ph->p_memsz);
 
 		pages_cpy(kern_pgdir, e->env_pgdir, ph->p_va, ph->p_memsz, PTE_P | PTE_W);
-		cprintf("ph->p_va=0x%x, ph->p_filesz=0x%x, ph->p_memsz=0x%x\n", ph->p_va, ph->p_filesz, ph->p_memsz);
 		memcpy((void*)ph->p_va, binary+ph->p_offset, ph->p_filesz);
 
 		clear_sz = ph->p_memsz - ph->p_filesz;
@@ -394,7 +392,6 @@ load_icode(struct Env *e, uint8_t *binary)
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
 
-	cprintf("mapping ustack\n");
 	// LAB 3: Your code here.
 	region_alloc(e, (void*)(USTACKTOP - PGSIZE), PGSIZE);
 	pages_cpy(kern_pgdir, e->env_pgdir, (USTACKTOP - PGSIZE), PGSIZE, PTE_P | PTE_W);
@@ -402,7 +399,6 @@ load_icode(struct Env *e, uint8_t *binary)
 	pages_clear(kern_pgdir, (USTACKTOP - PGSIZE), PGSIZE);
 
 	e->env_tf.tf_eip = (uintptr_t)(elfhdr->e_entry);
-	cprintf("entry eip=0x%x\n", e->env_tf.tf_eip);
 }
 
 //
@@ -419,15 +415,12 @@ env_create(uint8_t *binary, enum EnvType type)
   struct Env *env;
 	int ret;
 
-	cprintf("envs[0]=%p, env_free_list=%p\n", &envs[0], env_free_list);
 	if ((ret = env_alloc(&env, 0)) < 0)  {
 		panic("fail to alloca env: %e", ret);
 	}
-	cprintf("envs[0]=%p, envs[1]=%p, env_free_list=%p\n", &envs[0],&envs[1], env_free_list);
 	env->env_type = type;
 
 	load_icode(env, binary);
-	cprintf("envs[0].eip=0x%x envs[0].esp=0x%x\n", envs[0].env_tf.tf_eip, envs[0].env_tf.tf_esp);
 }
 
 //
@@ -545,7 +538,6 @@ env_run(struct Env *e)
 
 	// LAB 3: Your code here.
 	size_t idx;
-	cprintf("curenv=%p\n", curenv);
 	if (curenv && curenv->env_status == ENV_RUNNING) {
 		curenv->env_status = ENV_RUNNABLE;
 	}
@@ -555,7 +547,6 @@ env_run(struct Env *e)
 
 	idx = curenv - envs;
 
-	cprintf("env_tf=0x%p\n", &((((struct Env*)UENVS)[idx]).env_tf));
 	// write_esp(curenv->env_tf.tf_esp);
 	lcr3(PADDR(curenv->env_pgdir));
 	// write_ebp(((((struct Env*)UENVS)[idx]).env_tf).tf_esp);

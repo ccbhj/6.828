@@ -13,6 +13,7 @@
 #include <kern/pmap.h>
 #include <kern/kclock.h>
 #include <kern/env.h>
+#include "kdebug.h"
 
 // These variables are set by i386_detect_memory()
 size_t npages;			// Amount of physical memory (in pages)
@@ -57,7 +58,7 @@ i386_detect_memory(void)
 	npages = totalmem / (PGSIZE / 1024);
 	npages_basemem = basemem / (PGSIZE / 1024);
 
-	cprintf("Physical memory: %uK available, base = %uK, extended = %uK\n",
+	INFO("Physical memory: %uK available, base = %uK, extended = %uK\n",
 		totalmem, basemem, totalmem - basemem);
 }
 
@@ -150,7 +151,7 @@ mem_init(void)
 
 	// Permissions: kernel R, user R
 	kern_pgdir[PDX(UVPT)] = PADDR(kern_pgdir) | PTE_U | PTE_P;
-	cprintf("kern_pgdir=0x%x,UVPT=0x%x\n", kern_pgdir, UVPT);
+	DEBUG("kern_pgdir=0x%x,UVPT=0x%x\n", kern_pgdir, UVPT);
 
 	//////////////////////////////////////////////////////////////////////
 	// Allocate an array of npages 'struct PageInfo's and store it in 'pages'.
@@ -377,9 +378,6 @@ page_free(struct PageInfo *pp)
 			"page link is not zero, pp=%p, ref=%d, num=%d, link=%p", pp,  pp->pp_ref, pp-pages, pp->pp_link);
 
 	memset(page2kva(pp), 0, PGSIZE);
-	if ((uintptr_t)pp == 0xf0119000) {
-		cprintf("first page free here");
-	}
 	pp->pp_link = page_free_list;
 	page_free_list = pp;
 }
@@ -456,7 +454,7 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 {
 	// Fill this function in
 	pte_t *ptep;
-	cprintf("map region, va=0x%x, pa=0x%x, npage\n", va, pa, size >> PGSHIFT);
+	DEBUG("map region, va=0x%x, pa=0x%x, npage\n", va, pa, size >> PGSHIFT);
 	do {
 		ptep = pgdir_walk(pgdir, (void*)va, 1);
 		*ptep = pa | perm | PTE_P;
@@ -605,7 +603,22 @@ int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 3: Your code here.
-
+	uint32_t start;
+	size_t npages;
+	pte_t *pte;
+	npages = ROUNDUP(len, PGSIZE) >> PGSHIFT;
+	user_mem_check_addr = (uintptr_t)va;
+	start = ROUNDDOWN((uint32_t)(uintptr_t)va, PGSIZE);
+	perm |= PTE_P;
+	do {
+		if ((start > ULIM) || !page_lookup(env->env_pgdir, (void*)start, &pte) || 
+				(*pte & (perm)) == 0)  {
+			return -E_FAULT;
+		}
+		start += PGSIZE;
+		user_mem_check_addr = start;
+	} while (--npages);
+	user_mem_check_addr = 0;
 	return 0;
 }
 
@@ -691,7 +704,7 @@ check_page_free_list(bool only_low_memory)
 	assert(nfree_basemem > 0);
 	assert(nfree_extmem > 0);
 
-	cprintf("check_page_free_list() succeeded!\n");
+	INFO("check_page_free_list() succeeded!\n");
 }
 
 //
@@ -769,7 +782,7 @@ check_page_alloc(void)
 		--nfree;
 	assert(nfree == 0);
 
-	cprintf("check_page_alloc() succeeded!\n");
+	// INFO("check_page_alloc() succeeded!\n");
 }
 
 //
@@ -825,7 +838,7 @@ check_kern_pgdir(void)
 			break;
 		}
 	}
-	cprintf("check_kern_pgdir() succeeded!\n");
+	// INFO("check_kern_pgdir() succeeded!\n");
 }
 
 // This function returns the physical address of the page containing 'va',
@@ -1013,7 +1026,7 @@ check_page(void)
 	page_free(pp1);
 	page_free(pp2);
 
-	cprintf("check_page() succeeded!\n");
+	// cprintf("check_page() succeeded!\n");
 }
 
 // check page_insert, page_remove, &c, with an installed kern_pgdir
@@ -1055,7 +1068,7 @@ check_page_installed_pgdir(void)
 	// free the pages we took
 	page_free(pp0);
 
-	cprintf("check_page_installed_pgdir() succeeded!\n");
+	// INFO("check_page_installed_pgdir() succeeded!\n");
 }
 
 void

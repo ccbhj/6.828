@@ -2,6 +2,7 @@
 // controlling the kernel and exploring the system interactively.
 
 #include "inc/types.h"
+#include "kern/env.h"
 #include <inc/stdio.h>
 #include <inc/string.h>
 #include <inc/memlayout.h>
@@ -26,6 +27,8 @@ struct Command {
 static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
+	{ "continue", "Continue to run the user env", mon_continue },
+	{ "backtrace", "Display the backtrace", mon_backtrace },
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -152,4 +155,10 @@ monitor(struct Trapframe *tf)
 			if (runcmd(buf, tf) < 0)
 				break;
 	}
+}
+
+int
+mon_continue(int argc, char **argv, struct Trapframe *tf)
+{
+	env_run(curenv);
 }

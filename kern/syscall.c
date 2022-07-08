@@ -1,5 +1,8 @@
 /* See COPYRIGHT for copyright information. */
 
+#include "inc/mmu.h"
+#include "inc/stdio.h"
+#include "inc/types.h"
 #include <inc/x86.h>
 #include <inc/error.h>
 #include <inc/string.h>
@@ -11,6 +14,8 @@
 #include <kern/syscall.h>
 #include <kern/console.h>
 
+#include "kdebug.h"
+
 // Print a string to the system console.
 // The string is exactly 'len' characters long.
 // Destroys the environment on memory errors.
@@ -21,6 +26,19 @@ sys_cputs(const char *s, size_t len)
 	// Destroy the environment if not.
 
 	// LAB 3: Your code here.
+	size_t npage;
+	uint32_t start;
+	pte_t *pte;
+	npage = ROUNDUP(len, PGSIZE) >> PGSHIFT; 
+	start = (uint32_t)(uintptr_t)ROUNDDOWN((uint32_t)(uintptr_t)s, PGSIZE);
+	do {
+		if (!page_lookup(curenv->env_pgdir, (void*)start, &pte) || !(*pte & PTE_P)) {
+			env_destroy(curenv);
+			cprintf("page not present");
+			return;
+		}
+		start += PGSIZE;
+	} while(--npage);
 
 	// Print the string supplied by the user.
 	cprintf("%.*s", len, s);
@@ -54,10 +72,7 @@ sys_env_destroy(envid_t envid)
 
 	if ((r = envid2env(envid, &e, 1)) < 0)
 		return r;
-	if (e == curenv)
-		cprintf("[%08x] exiting gracefully\n", curenv->env_id);
-	else
-		cprintf("[%08x] destroying %08x\n", curenv->env_id, e->env_id);
+	cprintf("[%08x] exiting gracefully\n", e->env_id);
 	env_destroy(e);
 	return 0;
 }
@@ -70,11 +85,20 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	// Return any appropriate return value.
 	// LAB 3: Your code here.
 
-	panic("syscall not implemented");
-
+	DEBUG("imcoming syscall %d\n", syscallno);
 	switch (syscallno) {
-	default:
-		return -E_INVAL;
+		case SYS_cputs:
+			user_mem_assert(curenv, (const char*)a1, (size_t)a2, PTE_U);
+			sys_cputs((const char*)a1,  (size_t)a2);
+			return 0;
+		case SYS_cgetc:
+			return sys_cgetc();
+		case SYS_getenvid:
+			return sys_getenvid();
+		case SYS_env_destroy:
+			return sys_env_destroy(a1);
+		default:
+			return -E_INVAL;
 	}
 }
 

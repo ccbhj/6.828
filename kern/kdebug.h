@@ -17,4 +17,27 @@ struct Eipdebuginfo {
 
 int debuginfo_eip(uintptr_t eip, struct Eipdebuginfo *info);
 
+
+#define LOG_LEVEL LEVEL_DEBUG
+
+#define LEVEL_DEBUG 0
+#define LEVEL_INFO 1
+#define LEVEL_ERROR 2
+
+#define _LOG(level, fmt, ...) \
+	do { \
+		if ((level) < LOG_LEVEL)  \
+			break; \
+		cprintf("[%s:%d]"fmt, __FILE__, __LINE__, ##__VA_ARGS__); \
+	} while(0)
+
+#define DEBUG(fmt, ...) \
+		_LOG(LEVEL_DEBUG, "[DEBUG] " fmt, ##__VA_ARGS__)
+
+#define INFO(fmt, ...) \
+		_LOG(LEVEL_INFO, "[INFO] " fmt, ##__VA_ARGS__)
+
+#define ERROR(fmt, ...) \
+		_LOG(LEVEL_ERROR, "[ERROR] " fmt, ##__VA_ARGS__)
+
 #endif
