@@ -1,5 +1,5 @@
-#include <inc/x86.h>
-#include <inc/elf.h>
+#include "inc/x86.h"
+#include "inc/elf.h"
 
 /**********************************************************************
  * This a dirt simple boot loader, whose sole job is to boot
@@ -42,6 +42,7 @@ bootmain(void)
 	int i;
 
 	// read 1st page off disk
+	// call 0x7cda
 	readseg((uint32_t) ELFHDR, SECTSIZE*8, 0);
 
 	// is this a valid ELF?
@@ -62,6 +63,8 @@ bootmain(void)
 
 	// call the entry point from the ELF header
 	// note: does not return!
+	// 0x7d71
+	// call *0x10018(%rip) # 0x7d8f
 	((void (*)(void)) (ELFHDR->e_entry))();
 
 bad:
@@ -94,6 +97,7 @@ readseg(uint32_t pa, uint32_t count, uint32_t offset)
 		// an identity segment mapping (see boot.S), we can
 		// use physical addresses directly.  This won't be the
 		// case once JOS enables the MMU.
+		// call 0x7c78
 		readsect((uint8_t*) pa, offset);
 		pa += SECTSIZE;
 		offset++;
@@ -112,6 +116,7 @@ void
 readsect(void *dst, uint32_t offset)
 {
 	// wait for disk to be ready
+	// call 0x7c6a
 	waitdisk();
 
 	outb(0x1F2, 1);		// count = 1
@@ -127,4 +132,3 @@ readsect(void *dst, uint32_t offset)
 	// read a sector
 	insl(0x1F0, dst, SECTSIZE/4);
 }
-

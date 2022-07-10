@@ -1,5 +1,7 @@
 /* See COPYRIGHT for copyright information. */
 
+#include "inc/types.h"
+#include "inc/x86.h"
 #include <inc/stdio.h>
 #include <inc/string.h>
 #include <inc/assert.h>
@@ -113,6 +115,7 @@ mp_main(void)
 	// Remove this after you finish Exercise 6
 	for (;;);
 }
+
 
 /*
  * Variable panicstr contains argument to first call to panic; used as flag

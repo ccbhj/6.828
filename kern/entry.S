@@ -65,7 +65,9 @@ entry:
 	# Now paging is enabled, but we're still running at a low EIP
 	# (why is this okay?).  Jump up above KERNBASE before entering
 	# C code.
+	# mov $0xf010002f,%eax
 	mov	$relocated, %eax
+	# jmp *0xf010002f
 	jmp	*%eax
 relocated:
 

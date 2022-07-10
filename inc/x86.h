@@ -224,6 +224,18 @@ read_esp(void)
 }
 
 static inline void
+write_esp(uint32_t val)
+{
+	asm volatile("movl %0,%%esp" : : "r" (val));
+}
+
+static inline void
+write_ebp(uint32_t val)
+{
+	asm volatile("movl %0,%%ebp" : : "r" (val));
+}
+
+static inline void
 cpuid(uint32_t info, uint32_t *eaxp, uint32_t *ebxp, uint32_t *ecxp, uint32_t *edxp)
 {
 	uint32_t eax, ebx, ecx, edx;

@@ -52,6 +52,7 @@ seta20.2:
   
   # Jump to next instruction, but in 32-bit code segment.
   # Switches processor into 32-bit mode.
+  
   ljmp    $PROT_MODE_CSEG, $protcseg
 
   .code32                     # Assemble for 32-bit mode
@@ -66,6 +67,7 @@ protcseg:
   
   # Set up the stack pointer and call into C.
   movl    $start, %esp
+  # call 0x7d19
   call bootmain
 
   # If bootmain returns (it shouldn't), loop.

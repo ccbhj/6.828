@@ -1,3 +1,7 @@
+#include "inc/trap.h"
+#include "inc/error.h"
+#include "inc/memlayout.h"
+#include "inc/stdio.h"
 #include <inc/mmu.h>
 #include <inc/x86.h>
 #include <inc/assert.h>
@@ -13,6 +17,7 @@
 #include <kern/picirq.h>
 #include <kern/cpu.h>
 #include <kern/spinlock.h>
+#include "kdebug.h"
 
 static struct Taskstate ts;
 
@@ -65,6 +70,12 @@ static const char *trapname(int trapno)
 	return "(unknown trap)";
 }
 
+// selector must bge GD_KT, or you will get page fault
+#define TRAP_INIT_GATE(fn, num) \
+	SETGATE(idt[num], 1, GD_KT, (unsigned)(fn), 0)
+	
+#define TRAP_INIT_GATE_USER(fn, num) \
+	SETGATE(idt[num], 1, GD_KT, (unsigned)(fn), 3)
 
 void
 trap_init(void)
@@ -72,6 +83,27 @@ trap_init(void)
 	extern struct Segdesc gdt[];
 
 	// LAB 3: Your code here.
+	TRAP_INIT_GATE(trap_divide_zero, T_DIVIDE);
+	TRAP_INIT_GATE_USER(trap_debug, T_DEBUG);
+	TRAP_INIT_GATE(trap_nmi, T_NMI);
+	TRAP_INIT_GATE_USER(trap_breakpoint, T_BRKPT);
+	TRAP_INIT_GATE(trap_overflow, T_OFLOW);
+	TRAP_INIT_GATE(trap_bounds_check, T_BOUND);
+	TRAP_INIT_GATE(trap_illegal_op, T_ILLOP);
+	TRAP_INIT_GATE(trap_device, T_DEVICE);
+	TRAP_INIT_GATE(trap_double_fault, T_DBLFLT);
+	TRAP_INIT_GATE(trap_tss, T_TSS);
+	TRAP_INIT_GATE(trap_segnp, T_SEGNP);
+	TRAP_INIT_GATE(trap_stack, T_STACK);
+	TRAP_INIT_GATE(trap_general_protect_fault, T_GPFLT);
+	TRAP_INIT_GATE(trap_page_fault, T_PGFLT);
+	TRAP_INIT_GATE(trap_float_point_error, T_FPERR);
+	TRAP_INIT_GATE(trap_alignment, T_ALIGN);
+	TRAP_INIT_GATE(trap_machine, T_MCHK);
+	TRAP_INIT_GATE(trap_smid_flaot_point_error, T_SIMDERR);
+
+	TRAP_INIT_GATE_USER(trap_syscall, T_SYSCALL);
+
 
 	// Per-CPU setup 
 	trap_init_percpu();
@@ -129,6 +161,7 @@ void
 print_trapframe(struct Trapframe *tf)
 {
 	cprintf("TRAP frame at %p from CPU %d\n", tf, cpunum());
+	cprintf("TRAP frame at %p, last_tf %p\n", tf, last_tf);
 	print_regs(&tf->tf_regs);
 	cprintf("  es   0x----%04x\n", tf->tf_es);
 	cprintf("  ds   0x----%04x\n", tf->tf_ds);
@@ -152,6 +185,7 @@ print_trapframe(struct Trapframe *tf)
 	cprintf("  eip  0x%08x\n", tf->tf_eip);
 	cprintf("  cs   0x----%04x\n", tf->tf_cs);
 	cprintf("  flag 0x%08x\n", tf->tf_eflags);
+	// trap from kernel mode
 	if ((tf->tf_cs & 3) != 0) {
 		cprintf("  esp  0x%08x\n", tf->tf_esp);
 		cprintf("  ss   0x----%04x\n", tf->tf_ss);
@@ -176,6 +210,36 @@ trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
+	switch (tf->tf_trapno) {
+		case T_PGFLT  : 
+			page_fault_handler(tf);
+			return;
+		case T_BRKPT  : 
+			trap_breakpoint_handler(tf);
+			break;
+		case T_SYSCALL:
+			trap_syscall_handler(tf);
+			break;
+		case T_DIVIDE : 
+		case T_DEBUG  : 
+		case T_NMI    : 
+		case T_OFLOW  : 
+		case T_BOUND  : 
+		case T_ILLOP  : 
+		case T_DEVICE : 
+		case T_DBLFLT : 
+		case T_TSS    : 
+		case T_SEGNP  : 
+		case T_STACK  : 
+		case T_GPFLT  : 
+		case T_FPERR  : 
+		case T_ALIGN  : 
+		case T_MCHK   : 
+		case T_SIMDERR: 
+			trap_destruction_handler(tf);
+			return;
+	}
+
 
 	// Handle spurious interrupts
 	// The hardware sometimes raises these because of noise on the
@@ -220,6 +284,9 @@ trap(struct Trapframe *tf)
 	// fails, DO NOT be tempted to fix it by inserting a "cli" in
 	// the interrupt path.
 	assert(!(read_eflags() & FL_IF));
+
+	cprintf("Incoming TRAP frame at %p\n", tf);
+	DEBUG("TRAP num = %d\n", tf->tf_trapno);
 
 	if ((tf->tf_cs & 3) == 3) {
 		// Trapped from user mode.
@@ -269,6 +336,11 @@ page_fault_handler(struct Trapframe *tf)
 	fault_va = rcr2();
 
 	// Handle kernel-mode page faults.
+	if ((tf->tf_cs & 3) != 3) {
+		print_trapframe(tf);
+		panic("[%08x] kernel page fault va %08x ip %08x\n",
+			curenv->env_id, fault_va, tf->tf_eip);
+	}
 
 	// LAB 3: Your code here.
 
@@ -313,3 +385,29 @@ page_fault_handler(struct Trapframe *tf)
 	env_destroy(curenv);
 }
 
+void
+trap_breakpoint_handler(struct Trapframe *tf)
+{
+	while (1) {
+		monitor(tf);
+	}
+}
+
+void
+trap_destruction_handler(struct Trapframe *tf)
+{
+	print_trapframe(tf);
+	env_destroy(curenv);
+}
+
+void
+trap_syscall_handler(struct Trapframe *tf)
+{
+	uint32_t ret;
+	ret = syscall(tf->tf_regs.reg_eax, tf->tf_regs.reg_edx, tf->tf_regs.reg_ecx, tf->tf_regs.reg_ebx, tf->tf_regs.reg_edi, tf->tf_regs.reg_esi);
+	tf->tf_regs.reg_eax = ret;
+	if (ret == -E_INVAL)
+		env_destroy(curenv);
+	else
+		env_run(curenv);
+}

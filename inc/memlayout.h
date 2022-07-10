@@ -29,7 +29,7 @@
  *                     :              .               :
  *                     :              .               :
  *                     |~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~| RW/--
- *                     |                              | RW/--
+ *             0xf01b5000	        |                              | RW/--
  *                     |   Remapped Physical Memory   | RW/--
  *                     |                              | RW/--
  *    KERNBASE, ---->  +------------------------------+ 0xf0000000      --+
@@ -82,6 +82,7 @@
  *     there if desired.  JOS user programs map pages temporarily at UTEMP.
  */
 
+#define KLOADADDR 0xF0100000
 
 // All physical memory mapped at this address
 #define	KERNBASE	0xF0000000

@@ -25,6 +25,8 @@ extern pde_t *kern_pgdir;
  */
 #define PADDR(kva) _paddr(__FILE__, __LINE__, kva)
 
+#define virt2phys(kva) _paddr(__FILE__, __LINE__, kva)
+
 static inline physaddr_t
 _paddr(const char *file, int line, void *kva)
 {
@@ -36,6 +38,8 @@ _paddr(const char *file, int line, void *kva)
 /* This macro takes a physical address and returns the corresponding kernel
  * virtual address.  It panics if you pass an invalid physical address. */
 #define KADDR(pa) _kaddr(__FILE__, __LINE__, pa)
+
+#define phys2virt(pa) _kaddr(__FILE__, __LINE__, pa)
 
 static inline void*
 _kaddr(const char *file, int line, physaddr_t pa)
@@ -78,7 +82,7 @@ static inline struct PageInfo*
 pa2page(physaddr_t pa)
 {
 	if (PGNUM(pa) >= npages)
-		panic("pa2page called with invalid pa");
+		panic("pa2page called with invalid pa 0x%x", pa);
 	return &pages[PGNUM(pa)];
 }
 
@@ -90,4 +94,9 @@ page2kva(struct PageInfo *pp)
 
 pte_t *pgdir_walk(pde_t *pgdir, const void *va, int create);
 
+void mappages(pte_t *pgdir, uintptr_t from_va, physaddr_t to_pa, size_t npage, int perm);
+
+void setup_vm(pte_t *pgdir);
+int pages_cpy(pde_t *dst_pgdir, pde_t *src_pgdir, uintptr_t src_va, size_t len, int perm);
+void pages_clear(pde_t *pgdir, uintptr_t src_va, size_t len);
 #endif /* !JOS_KERN_PMAP_H */
