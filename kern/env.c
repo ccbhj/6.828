@@ -522,8 +522,6 @@ env_destroy(struct Env *e)
 void
 env_pop_tf(struct Trapframe *tf)
 {
-	// Record the CPU we are running on for user-space debugging
-	curenv->env_cpunum = cpunum();
 
 	asm volatile(
 		"\tmovl %0,%%esp\n"
@@ -573,8 +571,9 @@ env_run(struct Env *e)
 
 	idx = curenv - envs;
 
-	// write_esp(curenv->env_tf.tf_esp);
+	// Record the CPU we are running on for user-space debugging
+	curenv->env_cpunum = cpunum();
+  unlock_kernel();
 	lcr3(PADDR(curenv->env_pgdir));
-	// write_ebp(((((struct Env*)UENVS)[idx]).env_tf).tf_esp);
 	env_pop_tf(&((((struct Env*)UENVS)[idx]).env_tf));
 }

@@ -17,9 +17,10 @@
 #include <kern/picirq.h>
 #include <kern/cpu.h>
 #include <kern/spinlock.h>
+#include "inc/types.h"
 #include "kdebug.h"
 
-static struct Taskstate ts;
+// static struct Taskstate ts;
 
 /* For debugging, so print_trapframe can distinguish between printing
  * a saved trapframe and printing the current trapframe and print some
@@ -72,10 +73,10 @@ static const char *trapname(int trapno)
 
 // selector must bge GD_KT, or you will get page fault
 #define TRAP_INIT_GATE(fn, num) \
-	SETGATE(idt[num], 1, GD_KT, (unsigned)(fn), 0)
+	SETGATE(idt[num], 0, GD_KT, (unsigned)(fn), 0)
 	
 #define TRAP_INIT_GATE_USER(fn, num) \
-	SETGATE(idt[num], 1, GD_KT, (unsigned)(fn), 3)
+	SETGATE(idt[num], 2, GD_KT, (unsigned)(fn), 3)
 
 void
 trap_init(void)
@@ -140,18 +141,27 @@ trap_init_percpu(void)
 
 	// Setup a TSS so that we get the right stack
 	// when we trap to the kernel.
-	ts.ts_esp0 = KSTACKTOP;
-	ts.ts_ss0 = GD_KD;
-	ts.ts_iomb = sizeof(struct Taskstate);
+	struct Taskstate *this_ts;
+	uint8_t cpuid;
+
+	this_ts = &thiscpu->cpu_ts;
+	cpuid = thiscpu->cpu_id;
+
+	this_ts->ts_esp0 = (KSTACKTOP - ((KSTKSIZE + KSTKGAP) * cpuid));
+	this_ts->ts_ss0 = GD_KD;
+	// setting IOPL=0 in eflags *and* iomb beyond the tss segment limit
+  // forbids I/O instructions (e.g., inb and outb) from user space
+
+  this_ts->ts_iomb = sizeof(struct Taskstate);// (uint16_t)0xFFFF;
 
 	// Initialize the TSS slot of the gdt.
-	gdt[GD_TSS0 >> 3] = SEG16(STS_T32A, (uint32_t) (&ts),
+	gdt[(GD_TSS0 >> 3) + cpuid] = SEG16(STS_T32A, (uint32_t) (this_ts),
 					sizeof(struct Taskstate) - 1, 0);
-	gdt[GD_TSS0 >> 3].sd_s = 0;
+	gdt[(GD_TSS0 >> 3) + cpuid].sd_s = 0;
 
 	// Load the TSS selector (like other segment selectors, the
 	// bottom three bits are special; we leave them 0)
-	ltr(GD_TSS0);
+	ltr(((GD_TSS0 >> 3) + cpuid) << 3);
 
 	// Load the IDT
 	lidt(&idt_pd);
@@ -166,6 +176,7 @@ print_trapframe(struct Trapframe *tf)
 	cprintf("  es   0x----%04x\n", tf->tf_es);
 	cprintf("  ds   0x----%04x\n", tf->tf_ds);
 	cprintf("  trap 0x%08x %s\n", tf->tf_trapno, trapname(tf->tf_trapno));
+	cprintf("  errno 0x%08x\n", tf->tf_err);
 	// If this trap was a page fault that just happened
 	// (so %cr2 is meaningful), print the faulting linear address.
 	if (tf == last_tf && tf->tf_trapno == T_PGFLT)
@@ -220,6 +231,8 @@ trap_dispatch(struct Trapframe *tf)
 		case T_SYSCALL:
 			trap_syscall_handler(tf);
 			break;
+		case T_DBLFLT : 
+			DEBUG("double fault here, error code=0x%x\n", tf->tf_err);
 		case T_DIVIDE : 
 		case T_DEBUG  : 
 		case T_NMI    : 
@@ -227,7 +240,6 @@ trap_dispatch(struct Trapframe *tf)
 		case T_BOUND  : 
 		case T_ILLOP  : 
 		case T_DEVICE : 
-		case T_DBLFLT : 
 		case T_TSS    : 
 		case T_SEGNP  : 
 		case T_STACK  : 
@@ -294,7 +306,7 @@ trap(struct Trapframe *tf)
 		// serious kernel work.
 		// LAB 4: Your code here.
 		assert(curenv);
-
+		lock_kernel();
 		// Garbage collect if current enviroment is a zombie
 		if (curenv->env_status == ENV_DYING) {
 			env_free(curenv);

@@ -1,9 +1,14 @@
 #include <inc/assert.h>
 #include <inc/x86.h>
 #include <kern/spinlock.h>
-#include <kern/env.h>
-#include <kern/pmap.h>
 #include <kern/monitor.h>
+#include "inc/env.h"
+#include "inc/stdio.h"
+#include "inc/types.h"
+#include "kern/cpu.h"
+#include "kern/env.h"
+#include "kern/kdebug.h"
+#include "kern/pmap.h"
 
 void sched_halt(void);
 
@@ -29,7 +34,31 @@ sched_yield(void)
 	// below to halt the cpu.
 
 	// LAB 4: Your code here.
+	struct Env *env;
+	envid_t last_env_idx, next_env_idx;
+	size_t ei;
 
+	env = 0;
+	if (thiscpu->cpu_env && !envid2env(thiscpu->cpu_env->env_id, &env, true) && env) {
+		last_env_idx = env - envs;
+	} else {
+		last_env_idx = -1;
+	}
+  next_env_idx = last_env_idx;
+	DEBUG("last_env_idx = %d\n", last_env_idx);
+	do {
+		next_env_idx = (next_env_idx + 1) % NENV;
+		env = &envs[next_env_idx];
+		if (env->env_status == ENV_RUNNABLE) 
+			break;
+	} while (next_env_idx != last_env_idx);
+	DEBUG("env = %08x, status = %d\n", env->env_id, env->env_status);
+	if ((env && env->env_status == ENV_RUNNABLE) || 
+		 (env == thiscpu->cpu_env && env->env_status == ENV_RUNNING)){
+		DEBUG("schedule to run env %08x\n", env->env_id);
+		env_run(env);
+		return;
+	}
 	// sched_halt never returns
 	sched_halt();
 }

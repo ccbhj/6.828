@@ -90,6 +90,7 @@
 // At IOPHYSMEM (640K) there is a 384K hole for I/O.  From the kernel,
 // IOPHYSMEM can be addressed at KERNBASE + IOPHYSMEM.  The hole ends
 // at physical address EXTPHYSMEM.
+#define IOPHYSMEM_SIZE 0xa0000
 #define IOPHYSMEM	0x0A0000
 #define EXTPHYSMEM	0x100000
 

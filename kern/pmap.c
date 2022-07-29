@@ -216,7 +216,6 @@ mem_init(void)
 	//       overwrite memory.  Known as a "guard page".
 	//     Permissions: kernel RW, user NONE
 	// Your code goes here:
-	// bootstack
 
 
 	//////////////////////////////////////////////////////////////////////
@@ -280,6 +279,7 @@ mem_init_mp(void)
 	//
 	// LAB 4: Your code here:
 
+	setup_per_cpu_stack(kern_pgdir);
 }
 
 // --------------------------------------------------------------
@@ -335,6 +335,10 @@ page_init(void)
 	// envs
 	size_t env_arr_start  = PGNUM(PADDR((void*)(uintptr_t)envs)), env_arr_end = PGNUM(PADDR((void*)(envs + NENV)));
 
+	// mpentry
+	extern unsigned char mpentry_start[], mpentry_end[];
+	size_t mp_start = PGNUM(MPENTRY_PADDR), mp_end = PGNUM(MPENTRY_PADDR + (mpentry_end - mpentry_start));
+
 	// cprintf("npages_basemem=%d, npages=%d\n", npages_basemem, npages);
 	// cprintf("io_hole=[%d, %d]\n", io_start, io_end);
 
@@ -350,7 +354,8 @@ page_init(void)
 		    (io_start <= i && i <= io_end) || 
 		    (kpg_dir_start <= i && i <= kpg_dir_end) || 
 		    (page_arr_start <= i && i <= page_arr_end) || 
-		    (env_arr_start <= i && i <= env_arr_end) 
+		    (env_arr_start <= i && i <= env_arr_end) ||
+		    (mp_start <= i && i <= mp_end) 
 		)  {
 			pages[i].pp_link = NULL;
 			continue;
@@ -471,6 +476,33 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 	return &pte[PTX(va)];
 }
 
+int
+page_cpy(pde_t *src, pde_t *dst, const uint32_t addr, size_t npage, int perm)
+{
+	pte_t *pte;
+	struct PageInfo *pp;
+	size_t ncpy;
+	uintptr_t start;
+
+	start = (uintptr_t)addr;
+	ncpy = 0;
+	if (!npage || src == dst) 
+		return 0;
+	do {
+		if (!(pp = page_lookup(src, (void*)start, &pte))) 
+			goto next;
+		if (page_insert(dst, pp, (void*)start, PTE_P | perm)) {
+			ERR("fail to page_cpy when inserting, dst_pgdir=0x%x, src_pgdir=0x%x, va=0x%x\n", 
+					*dst, *src, start);
+			goto next;
+		}
+next:
+		start += PGSIZE;
+	} while (--npage);
+
+	return ncpy;
+}
+
 //
 // Map [va, va+size) of virtual address space to physical [pa, pa+size)
 // in the page table rooted at pgdir.  Size is a multiple of PGSIZE, and
@@ -487,7 +519,6 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 {
 	// Fill this function in
 	pte_t *ptep;
-	DEBUG("map region, va=0x%x, pa=0x%x, npage\n", va, pa, size >> PGSHIFT);
 	do {
 		ptep = pgdir_walk(pgdir, (void*)va, 1);
 		*ptep = pa | perm | PTE_P;
@@ -644,7 +675,21 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// Hint: The staff solution uses boot_map_region.
 	//
 	// Your code here:
-	panic("mmio_map_region not implemented");
+	uint32_t start;
+	size_t npages;
+	uintptr_t ret;
+	start = ROUNDDOWN(pa, PGSIZE);
+	size = ROUNDUP(size, PGSIZE);
+	if ((base + size) > MMIOLIM) {
+		panic("mmio_map_region overflow, base=0x%x, size=%d", base, size);
+	}
+
+	DEBUG("mmio_map_region map va 0x%x to pa 0x%x, size=%d\n", base, start, size);
+  boot_map_region(kern_pgdir, base, size, start, PTE_PCD|PTE_PWT|PTE_W);
+	ret = base;
+	base += size;
+
+	return (void*)ret;
 }
 
 static uintptr_t user_mem_check_addr;
@@ -888,6 +933,7 @@ check_kern_pgdir(void)
 	// check kernel stack
 	// (updated in lab 4 to check per-CPU kernel stacks)
 	for (n = 0; n < NCPU; n++) {
+		cprintf("check per-cpu kernel stack %d\n", n);
 		uint32_t base = KSTACKTOP - (KSTKSIZE + KSTKGAP) * (n + 1);
 		for (i = 0; i < KSTKSIZE; i += PGSIZE)
 			assert(check_va2pa(pgdir, base + KSTKGAP + i)
@@ -1177,7 +1223,7 @@ void
 mappages(pte_t *pgdir, uintptr_t from_va, physaddr_t to_pa, size_t npage, int perm) 
 {
 	struct PageInfo *pp;
-	//  cprintf("mapping va 0x%x to pa 0x%x, npage=%d\n", from_va, to_pa, npage);
+	// DEBUG("mapping va 0x%x to pa 0x%x, npage=%d\n", from_va, to_pa, npage);
 	for (; npage > 0; npage--) {
 		if (PGNUM(to_pa) >= npages)
 			pp = NULL;
@@ -1196,6 +1242,8 @@ pages_cpy(pde_t *dst_pgdir, pde_t *src_pgdir, uintptr_t src_va, size_t len, int 
 	size_t nr;
 	len = ROUNDUP(len, PGSIZE);
 	nr = len;
+	if (dst_pgdir == src_pgdir || len == 0)
+		return 0;
 	do {
 		pte = pgdir_walk(src_pgdir, (void*)src_va, 0);
 		if (!pte)
@@ -1248,10 +1296,53 @@ setup_vm(pte_t *pgdir)
 	  virt2phys(envs),
 		ROUNDUP(NENV*sizeof(struct Env), PGSIZE) >> PGSHIFT, PTE_P | PTE_W);
 
-	// kernel stack
-	mappages(pgdir, KSTACKTOP - KSTKSIZE, virt2phys(bootstack), KSTKSIZE >> PGSHIFT, PTE_P | PTE_W);
-
 	// all physical memory
 	mappages(pgdir, KERNBASE, 0, 0x10000, PTE_P | PTE_W);
+
+	mappages(pgdir, (uint32_t)phys2virt(IOPHYSMEM), IOPHYSMEM, IOPHYSMEM_SIZE >> PGSHIFT, PTE_P | PTE_W);
+
+	extern volatile uint32_t* lapic;
+	if (lapicaddr) {
+		DEBUG("mapping lapic from 0x%x to 0x%x\n", lapic, lapicaddr);
+		boot_map_region(pgdir, (uintptr_t)lapic, PGSIZE, lapicaddr, PTE_P|PTE_PCD|PTE_PWT);
+	}
+
+	setup_per_cpu_stack(pgdir);
 }
 
+void
+setup_per_cpu_stack(pte_t *pgdir) 
+{
+	// kernel stack
+	size_t c;
+	uint32_t kstack_start = KSTACKTOP;
+	for (c = 0; c < NCPU; c++) {
+			mappages(pgdir, kstack_start - KSTKSIZE, virt2phys(percpu_kstacks[c]), KSTKSIZE >> PGSHIFT, PTE_P | PTE_W);
+			kstack_start -= KSTKSIZE;
+			kstack_start -= KSTKGAP;
+	}
+
+// 	for (n = 0; n < NCPU; n++) {
+// 		uint32_t base = KSTACKTOP - (KSTKSIZE + KSTKGAP) * (n + 1);
+// 		for (i = 0; i < KSTKSIZE; i += PGSIZE)
+// 			assert(check_va2pa(pgdir, base + KSTKGAP + i)
+// 				== PADDR(percpu_kstacks[n]) + i);
+// 		for (i = 0; i < KSTKGAP; i += PGSIZE)
+// 			assert(check_va2pa(pgdir, base + i) == ~0);
+// 	}
+// 
+}
+
+// Map user virtual address to kernel address.
+char*
+uva2ka(pde_t *pgdir, char *uva)
+{
+  pte_t *pte;
+
+  pte = pgdir_walk(pgdir, uva, 0);
+  if((*pte & PTE_P) == 0)
+    return 0;
+  if((*pte & PTE_U) == 0)
+    return 0;
+  return (char*)phys2virt(PTE_ADDR(*pte));
+}

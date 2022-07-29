@@ -65,6 +65,8 @@ void	page_remove(pde_t *pgdir, void *va);
 struct PageInfo *page_lookup(pde_t *pgdir, void *va, pte_t **pte_store);
 void	page_decref(struct PageInfo *pp);
 
+int page_cpy(pde_t *src, pde_t *dst, const uint32_t addr, size_t npage, int perm);
+
 void	tlb_invalidate(pde_t *pgdir, void *va);
 
 void *	mmio_map_region(physaddr_t pa, size_t size);
@@ -99,4 +101,5 @@ void mappages(pte_t *pgdir, uintptr_t from_va, physaddr_t to_pa, size_t npage, i
 void setup_vm(pte_t *pgdir);
 int pages_cpy(pde_t *dst_pgdir, pde_t *src_pgdir, uintptr_t src_va, size_t len, int perm);
 void pages_clear(pde_t *pgdir, uintptr_t src_va, size_t len);
+void setup_per_cpu_stack(pte_t *pgdir);
 #endif /* !JOS_KERN_PMAP_H */

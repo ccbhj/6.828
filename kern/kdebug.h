@@ -37,7 +37,7 @@ int debuginfo_eip(uintptr_t eip, struct Eipdebuginfo *info);
 #define INFO(fmt, ...) \
 		_LOG(LEVEL_INFO, "[INFO] " fmt, ##__VA_ARGS__)
 
-#define ERROR(fmt, ...) \
+#define ERR(fmt, ...) \
 		_LOG(LEVEL_ERROR, "[ERROR] " fmt, ##__VA_ARGS__)
 
 #endif
