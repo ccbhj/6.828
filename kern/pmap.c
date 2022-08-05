@@ -59,8 +59,8 @@ i386_detect_memory(void)
 	npages = totalmem / (PGSIZE / 1024);
 	npages_basemem = basemem / (PGSIZE / 1024);
 
-	INFO("Physical memory: %uK available, base = %uK, extended = %uK\n",
-		totalmem, basemem, totalmem - basemem);
+	INFO("Physical memory: %uK available, base = %uK, extended = %uK, npages=%d\n",
+		totalmem, basemem, totalmem - basemem, npages);
 }
 
 
@@ -457,12 +457,12 @@ pte_t *
 pgdir_walk(pde_t *pgdir, const void *va, int create)
 {
 	// Fill this function in
-	pde_t *pgtab;
-	pte_t *pte;
-	struct PageInfo *new_pg;
+	pde_t *pgtab = NULL;
+	pte_t *pte = NULL;
+	struct PageInfo *new_pg = NULL;
 
 	pgtab = &pgdir[PDX(va)];
-	if (*pgtab & PTE_P) {
+	if (pgtab && (*pgtab & PTE_P)) {
 		pte = phys2virt(PTE_ADDR(*pgtab));
 		return &pte[PTX(va)];
 	}
@@ -471,8 +471,9 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 	if (!create || !(new_pg = page_alloc(ALLOC_ZERO)))
 		return NULL;
 	new_pg->pp_ref++;
+	new_pg->pp_link = NULL;
+	pgdir[PDX(va)] = page2pa(new_pg) | PTE_P | PTE_W | PTE_U;
 	pte = (pte_t*)page2kva(new_pg);
-	*pgtab = virt2phys(pte) | PTE_P | PTE_W | PTE_U;
 	return &pte[PTX(va)];
 }
 
@@ -557,24 +558,23 @@ int
 page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 {
 	// Fill this function in
-	pte_t *pte = pgdir_walk(pgdir, va, 1);
-	pte_t oldpte;
-	if (!pte)
-		return -E_NO_MEM;
-	
-	oldpte = *pte;
-	if (pp)
-		pp->pp_ref++; 
-	if (*pte & PTE_P) {
-		page_remove(pgdir, va);
-	}
 
-	if (pp) {
-		*pte = page2pa(pp) | PTE_P | perm;
-		pp->pp_ref -= PTE_ADDR(pte) == PTE_ADDR(oldpte);
-	} else {
-		*pte = 0;
-	}
+	struct PageInfo *oldpp;
+	pte_t *pte;
+
+	oldpp = NULL;
+	pte = NULL;
+	if (!(pte = pgdir_walk(pgdir, va, 1)))
+		return -E_NO_MEM;
+
+	if (*pte && (*pte & PTE_P)) 
+		oldpp = pa2page(PTE_ADDR(*pte));
+	if (oldpp && oldpp != pp)  
+		page_remove(pgdir, va);
+
+	*pte = page2pa(pp) | PTE_P | perm;
+	if (pp)
+		pp->pp_ref += !oldpp || (oldpp && oldpp != pp);
 
 	return 0;
 }
@@ -595,7 +595,7 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 {
 	// Fill this function in
 	pte_t *ptep;
-	if (!(ptep = pgdir_walk(pgdir, va, 0)))
+	if (!(ptep = pgdir_walk(pgdir, va, 1)) || !(*ptep & PTE_P))
 		return NULL;
 	if (pte_store)
 		*pte_store = ptep;
@@ -621,11 +621,11 @@ void
 page_remove(pde_t *pgdir, void *va)
 {
 	// Fill this function in
-	pte_t *pte;
-	struct PageInfo *pp;
+	pte_t *pte = NULL;
+	struct PageInfo *pp = NULL;
 	if (!(pp = page_lookup(pgdir, va, &pte)))
 		return;
-	if (*pte) 
+	if (pte) 
 		*pte = 0;
 	page_decref(pp);
 	tlb_invalidate(pgdir, va);
@@ -954,7 +954,10 @@ check_kern_pgdir(void)
 			break;
 		default:
 			if (i >= PDX(KERNBASE)) {
-				assert(pgdir[i] & PTE_P);
+				if (!(pgdir[i] & PTE_P)) {
+					cprintf("i = %d, pde=0x%x, pgdir[i]=0x%x\n", i, i << 22, pgdir[i]);
+					assert(pgdir[i] & PTE_P);
+				}
 				assert(pgdir[i] & PTE_W);
 			} else
 				assert(pgdir[i] == 0);
@@ -1229,6 +1232,7 @@ mappages(pte_t *pgdir, uintptr_t from_va, physaddr_t to_pa, size_t npage, int pe
 			pp = NULL;
 		else
 			pp = pa2page(to_pa);
+
 		page_insert(pgdir, pp, (void*)from_va, perm);
 		from_va += PGSIZE;
 		to_pa += PGSIZE;
@@ -1299,6 +1303,7 @@ setup_vm(pte_t *pgdir)
 	// all physical memory
 	mappages(pgdir, KERNBASE, 0, 0x10000, PTE_P | PTE_W);
 
+	cprintf("mapping IOPHYSMEM 0x%x\n", (uint32_t)phys2virt(IOPHYSMEM));
 	mappages(pgdir, (uint32_t)phys2virt(IOPHYSMEM), IOPHYSMEM, IOPHYSMEM_SIZE >> PGSHIFT, PTE_P | PTE_W);
 
 	extern volatile uint32_t* lapic;
@@ -1307,6 +1312,7 @@ setup_vm(pte_t *pgdir)
 		boot_map_region(pgdir, (uintptr_t)lapic, PGSIZE, lapicaddr, PTE_P|PTE_PCD|PTE_PWT);
 	}
 
+	assert(pgdir[992] & PTE_P);
 	setup_per_cpu_stack(pgdir);
 }
 

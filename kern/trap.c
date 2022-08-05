@@ -268,9 +268,10 @@ trap_dispatch(struct Trapframe *tf)
 
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
-	if (tf->tf_cs == GD_KT)
+	if (tf->tf_cs == GD_KT) {
+		unlock_kernel();
 		panic("unhandled trap in kernel");
-	else {
+	} else {
 		env_destroy(curenv);
 		return;
 	}
@@ -279,6 +280,7 @@ trap_dispatch(struct Trapframe *tf)
 void
 trap(struct Trapframe *tf)
 {
+	int lock = 0;
 	// The environment may have set DF and some versions
 	// of GCC rely on DF being clear
 	asm volatile("cld" ::: "cc");
@@ -290,8 +292,10 @@ trap(struct Trapframe *tf)
 
 	// Re-acqurie the big kernel lock if we were halted in
 	// sched_yield()
-	if (xchg(&thiscpu->cpu_status, CPU_STARTED) == CPU_HALTED)
+	if (xchg(&thiscpu->cpu_status, CPU_STARTED) == CPU_HALTED) {
 		lock_kernel();
+		lock = 1;
+	}
 	// Check that interrupts are disabled.  If this assertion
 	// fails, DO NOT be tempted to fix it by inserting a "cli" in
 	// the interrupt path.
@@ -306,7 +310,8 @@ trap(struct Trapframe *tf)
 		// serious kernel work.
 		// LAB 4: Your code here.
 		assert(curenv);
-		lock_kernel();
+		if (!lock)
+			lock_kernel();
 		// Garbage collect if current enviroment is a zombie
 		if (curenv->env_status == ENV_DYING) {
 			env_free(curenv);
@@ -416,9 +421,13 @@ void
 trap_syscall_handler(struct Trapframe *tf)
 {
 	uint32_t ret;
-	ret = syscall(tf->tf_regs.reg_eax, tf->tf_regs.reg_edx, tf->tf_regs.reg_ecx, tf->tf_regs.reg_ebx, tf->tf_regs.reg_edi, tf->tf_regs.reg_esi);
+	uint32_t num;
+	num = tf->tf_regs.reg_eax;
+	DEBUG("incomming syscall %d\n", num);
+	ret = syscall(num, tf->tf_regs.reg_edx, tf->tf_regs.reg_ecx, tf->tf_regs.reg_ebx, tf->tf_regs.reg_edi, tf->tf_regs.reg_esi);
 	tf->tf_regs.reg_eax = ret;
-	if (ret == -E_INVAL)
+	DEBUG("syscall %d return %d\n", num, ret);
+	if (ret < 0)
 		env_destroy(curenv);
 	else
 		env_run(curenv);

@@ -18,6 +18,7 @@
 #include <kern/sched.h>
 #include <kern/cpu.h>
 #include <kern/spinlock.h>
+#include "kern/kdebug.h"
 
 struct Env *envs = NULL;		// All environments
 static struct Env *env_free_list;	// Free environment list
@@ -573,6 +574,7 @@ env_run(struct Env *e)
 
 	// Record the CPU we are running on for user-space debugging
 	curenv->env_cpunum = cpunum();
+	// unlock the kernel 
   unlock_kernel();
 	lcr3(PADDR(curenv->env_pgdir));
 	env_pop_tf(&((((struct Env*)UENVS)[idx]).env_tf));

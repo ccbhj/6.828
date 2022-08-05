@@ -2,6 +2,7 @@
 
 #include "inc/types.h"
 #include "inc/x86.h"
+#include "kern/kdebug.h"
 #include <inc/stdio.h>
 #include <inc/string.h>
 #include <inc/assert.h>
@@ -55,16 +56,12 @@ i386_init(void)
 	ENV_CREATE(TEST, ENV_TYPE_USER);
 #else
 	// Touch all you want.
-	ENV_CREATE(user_hello, ENV_TYPE_USER);
-	ENV_CREATE(user_hello, ENV_TYPE_USER);
-	ENV_CREATE(user_hello, ENV_TYPE_USER);
-	ENV_CREATE(user_hello, ENV_TYPE_USER);
-	ENV_CREATE(user_hello, ENV_TYPE_USER);
+	ENV_CREATE(user_dumbfork, ENV_TYPE_USER);
 #endif // TEST*
 
 	// Schedule and run the first user environment!
 	sched_yield();
-	panic("not finish yet!!!");
+	ERR("should not get here");
 }
 
 // While boot_aps is booting a given CPU, it communicates the per-core
@@ -121,7 +118,7 @@ mp_main(void)
 	sched_yield();
 
 	// Remove this after you finish Exercise 6
-	for (;;);
+	// for (;;);
 }
 
 

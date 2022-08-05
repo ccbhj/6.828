@@ -16,6 +16,7 @@ void sched_halt(void);
 void
 sched_yield(void)
 {
+	DEBUG("CPU %d enter scheduler\n", thiscpu->cpu_id);
 	struct Env *idle;
 
 	// Implement simple round-robin scheduling.
@@ -34,32 +35,35 @@ sched_yield(void)
 	// below to halt the cpu.
 
 	// LAB 4: Your code here.
-	struct Env *env;
-	envid_t last_env_idx, next_env_idx;
-	size_t ei;
+	struct Env *env, *orig_env;
+	size_t orig_idx, next_env_idx;
 
-	env = 0;
-	if (thiscpu->cpu_env && !envid2env(thiscpu->cpu_env->env_id, &env, true) && env) {
-		last_env_idx = env - envs;
-	} else {
-		last_env_idx = -1;
+	env = NULL;
+	orig_idx = next_env_idx = 0;
+	if (thiscpu->cpu_env && !envid2env(thiscpu->cpu_env->env_id, &orig_env, true) && orig_env) {
+		orig_idx = orig_env - envs;
+		next_env_idx = orig_idx + 1;
 	}
-  next_env_idx = last_env_idx;
-	DEBUG("last_env_idx = %d\n", last_env_idx);
+
 	do {
-		next_env_idx = (next_env_idx + 1) % NENV;
 		env = &envs[next_env_idx];
 		if (env->env_status == ENV_RUNNABLE) 
 			break;
-	} while (next_env_idx != last_env_idx);
+		next_env_idx = (next_env_idx + 1) % NENV;
+	} while (next_env_idx != orig_idx);
+
 	DEBUG("env = %08x, status = %d\n", env->env_id, env->env_status);
-	if ((env && env->env_status == ENV_RUNNABLE) || 
-		 (env == thiscpu->cpu_env && env->env_status == ENV_RUNNING)){
-		DEBUG("schedule to run env %08x\n", env->env_id);
+	if (env && env->env_status == ENV_RUNNABLE)  {
+		DEBUG("CPU %d exit scheduler\n", thiscpu->cpu_id);
 		env_run(env);
-		return;
+	} else if (orig_env && orig_env->env_status == ENV_RUNNING) {
+		DEBUG("scheduler run last env %08x\n", orig_env->env_id);
+		DEBUG("CPU %d exit scheduler\n", thiscpu->cpu_id);
+		env_run(orig_env);
 	}
 	// sched_halt never returns
+	DEBUG("cpu %d halt\n", thiscpu->cpu_id);
+	DEBUG("CPU %d exit scheduler\n", thiscpu->cpu_id);
 	sched_halt();
 }
 
