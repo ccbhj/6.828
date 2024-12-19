@@ -43,6 +43,8 @@ enum EnvType {
 	ENV_TYPE_USER = 0,
 };
 
+struct EnvList;
+
 struct Env {
 	struct Trapframe env_tf;	// Saved registers
 	struct Env *env_link;		// Next free Env
@@ -60,6 +62,7 @@ struct Env {
 	void *env_pgfault_upcall;	// Page fault upcall entry point
 
 	// Lab 4 IPC
+	struct EnvList *env_ipc_sending; // Envs that are waiting to send msg
 	bool env_ipc_recving;		// Env is blocked receiving
 	void *env_ipc_dstva;		// VA at which to map received page
 	uint32_t env_ipc_value;		// Data value sent to us
@@ -67,4 +70,8 @@ struct Env {
 	int env_ipc_perm;		// Perm of page mapping received
 };
 
+struct EnvList {
+	envid_t env_id;
+	struct EnvList *next;
+};
 #endif // !JOS_INC_ENV_H

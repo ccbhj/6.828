@@ -1,7 +1,7 @@
 // The local APIC manages internal (non-I/O) interrupts.
 // See Chapter 8 & Appendix C of Intel processor manual volume 3.
 
-#include "kern/kdebug.h"
+#include "inc/log.h"
 #include <inc/types.h>
 #include <inc/memlayout.h>
 #include <inc/trap.h>

@@ -30,13 +30,11 @@ extern struct spinlock kernel_lock;
 
 #define lock_kernel() \
 do { \
-	DEBUG("CPU %d lock kernel\n", thiscpu->cpu_id); \
 	spin_lock(&kernel_lock); \
 } while(0) \
 
 #define unlock_kernel() \
 do { \
-	DEBUG("CPU %d unlock kernel\n", thiscpu->cpu_id); \
 	spin_unlock(&kernel_lock); \
 	asm volatile("pause"); \
 } while(0) \

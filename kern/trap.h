@@ -26,6 +26,7 @@ void backtrace(struct Trapframe *);
 void trap_destruction_handler(struct Trapframe *tf);
 void trap_breakpoint_handler(struct Trapframe *tf);
 void trap_syscall_handler(struct Trapframe *tf);
+void irq_timer_handler(struct Trapframe *tf);
 
 DECLARE_TRAP_FUNC(trap_divide_zero);
 DECLARE_TRAP_FUNC(trap_debug);
@@ -46,4 +47,10 @@ DECLARE_TRAP_FUNC(trap_alignment);
 DECLARE_TRAP_FUNC(trap_machine);
 DECLARE_TRAP_FUNC(trap_smid_flaot_point_error);
 DECLARE_TRAP_FUNC(trap_syscall);
+
+DECLARE_TRAP_FUNC(irq_timer);
+DECLARE_TRAP_FUNC(irq_kbd);
+DECLARE_TRAP_FUNC(irq_serial);
+DECLARE_TRAP_FUNC(irq_spurious);
+DECLARE_TRAP_FUNC(irq_ide);
 #endif /* JOS_KERN_TRAP_H */

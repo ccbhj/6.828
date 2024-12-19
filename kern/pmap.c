@@ -14,7 +14,7 @@
 #include <kern/kclock.h>
 #include <kern/env.h>
 #include <kern/cpu.h>
-#include "kdebug.h"
+#include "inc/log.h"
 
 // These variables are set by i386_detect_memory()
 size_t npages;			// Amount of physical memory (in pages)
@@ -1303,7 +1303,6 @@ setup_vm(pte_t *pgdir)
 	// all physical memory
 	mappages(pgdir, KERNBASE, 0, 0x10000, PTE_P | PTE_W);
 
-	cprintf("mapping IOPHYSMEM 0x%x\n", (uint32_t)phys2virt(IOPHYSMEM));
 	mappages(pgdir, (uint32_t)phys2virt(IOPHYSMEM), IOPHYSMEM, IOPHYSMEM_SIZE >> PGSHIFT, PTE_P | PTE_W);
 
 	extern volatile uint32_t* lapic;

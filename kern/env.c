@@ -202,7 +202,10 @@ env_setup_vm(struct Env *e)
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
 	e->env_pgdir[PDX(UVPT)] = PADDR(e->env_pgdir) | PTE_P | PTE_U;
-
+	for (i = 0; i < NPDENTRIES; i++)
+		if (e->env_pgdir[i] & PTE_P)
+			mappages(e->env_pgdir, e->env_pgdir[i], PTE_ADDR(e->env_pgdir[i]), 1, PTE_P | PTE_U);
+	
 	return 0;
 }
 
@@ -259,6 +262,7 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	e->env_tf.tf_ss = GD_UD | 3;
 	e->env_tf.tf_esp = USTACKTOP;
 	e->env_tf.tf_cs = GD_UT | 3;
+	e->env_tf.tf_eflags |= FL_IF;
 	// You will set e->env_tf.tf_eip later.
 
 	// Enable interrupts while in user mode.

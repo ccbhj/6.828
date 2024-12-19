@@ -50,6 +50,7 @@
 #define PGSIZE		4096		// bytes mapped by a page
 #define PGSHIFT		12		// log2(PGSIZE)
 #define PGMASK		(PGSIZE - 1)		// log2(PGSIZE)
+#define PGALIGNED(va) (((uint32_t)va & (PGSIZE-1)) == 0)
 
 #define PTSIZE		(PGSIZE*NPTENTRIES) // bytes mapped by a page directory entry
 #define PTSHIFT		22		// log2(PTSIZE)
@@ -73,7 +74,8 @@
 #define PTE_AVAIL	0xE00	// Available for software use
 
 // Flags in PTE_SYSCALL may be used in system calls.  (Others may not.)
-#define PTE_SYSCALL	(PTE_AVAIL | PTE_P | PTE_W | PTE_U)
+#define PTE_SYSCALL	(PTE_AVAIL | PTE_P | PTE_W | PTE_U | PTE_A)
+#define SYSCALL_PERM(perm) ((perm & ~(PTE_SYSCALL)) == 0)
 
 // Address in page table or page directory entry
 #define PTE_ADDR(pte)	((physaddr_t) (pte) & ~0xFFF)

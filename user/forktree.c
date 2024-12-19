@@ -1,5 +1,8 @@
 // Fork a binary tree of processes and display their structure.
 
+#include "inc/stdio.h"
+#include "inc/string.h"
+#include "inc/x86.h"
 #include <inc/lib.h>
 
 #define DEPTH 3
